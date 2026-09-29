@@ -66,20 +66,34 @@ function finish(code) {
  */
 function runHookOffProbe() {
   const { spawnSync } = require('node:child_process')
+  // 必须 delete，不能赋空串 —— 这是个平台差异坑：
+  // macOS/Linux 上 `VAR=` 等效于未设置，**Windows 上不是**。Windows 下空串同样算「变量存在」，
+  // Electron 据此判定 ELECTRON_RUN_AS_NODE 生效，把子进程退化成纯 Node 模式；
+  // 于是 require('electron') 只拿到一个可执行文件路径字符串，加载主进程产物时直接崩。
+  // 这个只在 GitHub 的 windows-latest 上暴露过，本机 macOS 一直正常。
+  const env = { ...process.env }
+  delete env.FWJC_TEST_HOOKS
+  delete env.ELECTRON_RUN_AS_NODE
   const res = spawnSync(
     process.execPath,
     [join(__dirname, 'e2e-testhook-off.cjs'), '--no-sandbox', '--disable-gpu'],
     {
       timeout: 60000,
       encoding: 'utf8',
-      // 显式清掉两个变量：钩子开关关掉，ELECTRON_RUN_AS_NODE 空串即视为未设置
-      env: { ...process.env, FWJC_TEST_HOOKS: '', ELECTRON_RUN_AS_NODE: '' }
+      env
     }
   )
   const out = `${res.stdout || ''}${res.stderr || ''}`
   const line = out.split('\n').find((l) => l.startsWith('HOOKOFF_JSON '))
   if (!line) {
-    return { ran: false, reason: `未拿到子进程结果（exit=${res.status}）\n${out.slice(-800)}` }
+    // 真正的报错行（例如 "Cannot find module"）在输出的**开头**，栈在末尾。
+    // 只截尾巴会把最有用的那一行丢掉 —— 上一版就是这么把线索弄没的。
+    const head = out.slice(0, 700)
+    const tail = out.slice(-500)
+    return {
+      ran: false,
+      reason: `未拿到子进程结果（exit=${res.status}）\n--- 输出开头 ---\n${head}\n--- 输出结尾 ---\n${tail}`
+    }
   }
   try {
     return { ran: true, code: res.status, ...JSON.parse(line.slice('HOOKOFF_JSON '.length)) }
@@ -548,6 +562,10 @@ app.whenReady().then(async () => {
     const off = runHookOffProbe()
     if (!off.ran) {
       problems.push(`测试钩子回归子进程未跑通：${off.reason}`)
+    } else if (off.invalid) {
+      // 子进程自己发现运行环境不对（比如退化成纯 Node 模式）：这种「跑完了但结论不算数」
+      // 必须报失败，否则后面几条断言会因为值恰好等于默认值而伪装成通过
+      problems.push(`测试钩子回归未取得有效结果：${off.note}`)
     } else {
       eq('子进程里普通接口依然可用（preload 正常）', off.hasAdd, true)
       eq('子进程渲染层拿不到测试钩子', off.hasTestHook, false)

@@ -20,7 +20,27 @@ const dataDir = mkdtempSync(join(tmpdir(), 'fwjc-hookoff-'))
 process.env.FWJC_USER_DATA = dataDir
 delete process.env.FWJC_TEST_HOOKS
 
-const { app, BrowserWindow, ipcMain } = require('electron')
+const electronModule = require('electron')
+
+// 先确认自己真的跑在 Electron 里，而不是被 ELECTRON_RUN_AS_NODE 退化成了纯 Node。
+// 退化时 require('electron') 只返回一个可执行文件路径字符串，紧接着加载主进程产物会以
+// 「找不到模块」之类的形式崩掉，病因极难看出来（这个坑只在 windows-latest 上暴露过）。
+// 注意：Windows 上把变量赋成空串**不等于**清掉它，必须整个 delete。
+if (typeof electronModule !== 'object' || electronModule === null || !electronModule.app) {
+  console.log(
+    `HOOKOFF_JSON ${JSON.stringify({
+      invalid: true,
+      note:
+        '子进程退化成了纯 Node 模式（ELECTRON_RUN_AS_NODE 没被清干净），本次回归结论无效。' +
+        'Windows 上空串不等于未设置，必须整个删掉这个变量。',
+      ELECTRON_RUN_AS_NODE: String(process.env.ELECTRON_RUN_AS_NODE),
+      execPath: process.execPath
+    })}`
+  )
+  process.exit(1)
+}
+
+const { app, BrowserWindow, ipcMain } = electronModule
 
 // 加载真正的应用主进程（与 e2e-smoke 用的是同一份产物）
 require(join(__dirname, '..', 'out', 'main', 'index.js'))
