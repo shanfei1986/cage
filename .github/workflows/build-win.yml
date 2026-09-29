@@ -91,3 +91,17 @@ jobs:
             dist/latest.yml
           if-no-files-found: error
           retention-days: 30
+
+      # 端到端冒烟：真实 Electron 里跑 IPC、界面渲染和 fwjc-media:// 取图（当前 92 项）。
+      #
+      # 为什么放在上传之后、且不阻断：
+      # 这一步覆盖的恰是 Windows 上唯一没被验证过的部分 —— 自定义协议取图、窗口与渲染、
+      # 主进程 IPC。selftest 跑不到这些（它不加载 Electron），而本地 e2e 只在 macOS 上跑过，
+      # 「macOS 能显示照片」不代表 Windows 也能。所以这里在真实 Windows 上跑一遍。
+      #
+      # 但它依赖图形环境与渲染时序，在 CI 的软件渲染下存在偶发失败的可能，
+      # 而这时候安装包已经产出且传好了 —— 没有理由为了一个诊断结论把已经做好的包判废。
+      # 跑通之后可以把 continue-on-error 去掉。
+      - name: 端到端冒烟（诊断用，不阻断出包）
+        run: npm run e2e
+        continue-on-error: true
