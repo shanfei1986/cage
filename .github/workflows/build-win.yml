@@ -5,8 +5,9 @@ name: 构建 Windows 安装包
 # 默认产出 arm64、目录名长度敏感、无法签名三个坑。放到真实的 win32
 # 环境里构建，这些问题全部消失，也不需要你自己准备一台 Windows 电脑。
 #
-# 免费额度：私有仓库 Free 计划每月 2000 分钟，Windows runner 按 2 倍计
-# （约 1000 Windows 分钟/月）。单次构建 3-8 分钟，够用 100 多次。
+# 免费额度：公开仓库的 Actions 完全免费、不计额度；私有仓库 Free 计划
+# 每月 2000 分钟，Windows runner 按 2 倍计（约 1000 Windows 分钟/月）。
+# 单次构建 3-8 分钟，怎么都够用。
 
 on:
   push:
@@ -17,6 +18,11 @@ on:
 
 permissions:
   contents: read
+
+# 连续推两次时取消前一次没跑完的构建，避免同一版本产出两份互相覆盖的包
+concurrency:
+  group: build-win-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build-win:
@@ -55,12 +61,23 @@ jobs:
             console.log('主进程运行时依赖校验通过：' + need.join(', '));
           "
 
+      # electron-vite 用 esbuild 转译，只剥类型、不做检查，所以 tsc 是唯一的
+      # 类型关卡。本地已全绿，这里放行等于把类型错误直接带到安装包里。
       - name: 类型检查
         run: npm run typecheck
-        continue-on-error: true
 
+      # 在真实的 Windows 上跑数据层自检（当前 143 项）。
+      # 这是整条流水线里最值的一步：项目用的是 Node 内置 node:sqlite，没有任何
+      # 原生模块，而这恰恰意味着「本地跑得好好的」不能代表 Windows 上也对 ——
+      # WAL 行为、文件锁、路径分隔符、排序规则、迁移事务都可能不同。
+      # 这一步过了，「装到同事电脑上一导出就报错」这类只在 Windows 才炸的问题
+      # 就能在出包前被拦住；不过就根本不出包。
+      - name: 数据层自检（在 Windows 上验证 SQLite 与业务逻辑）
+        run: npm run selftest
+
+      # 一次产出两个文件：NSIS 安装包 + 免安装单文件版
       - name: 构建并打包
-        run: npm run build:win
+        run: npm run build:win:all
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

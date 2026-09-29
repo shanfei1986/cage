@@ -646,9 +646,18 @@ console.log(`  通过 ${passed} 项，失败 ${failed} 项`)
 console.log(`  数据库文件：${dbPath}`)
 
 // 清理临时目录（失败时保留，便于排查）
+//
+// 这段必须包 try/catch：Windows 上文件句柄的释放比类 Unix 慢半拍，
+// 刚 close 掉的 SQLite 库文件仍可能被占用，rmSync 会抛 EBUSY/EPERM。
+// 清理失败只是留了点垃圾在临时目录，不该让整轮自检判失败。
 if (failed === 0) {
-  rmSync(dataDir, { recursive: true, force: true })
-  console.log('  临时数据已清理')
+  try {
+    rmSync(dataDir, { recursive: true, force: true })
+    console.log('  临时数据已清理')
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.log(`  临时数据清理失败（不影响结果，可手动删除）：${msg}`)
+  }
 } else {
   console.log(`  存在失败项，临时目录保留：${dataDir}`)
 }
