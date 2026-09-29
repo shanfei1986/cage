@@ -17,6 +17,8 @@ import { getDb } from '../db/connection'
 import * as repo from '../db/repositories/project.repo'
 import { addLog } from '../db/repositories/log.repo'
 import { getTaskPrefix } from '../db/repositories/setting.repo'
+import { getAlertProjectIds } from './alert.service'
+import { removeProjectFiles } from './attachment.service'
 
 function operatorName(): string {
   try {
@@ -64,7 +66,18 @@ export function checkTaskNo(
 }
 
 export function listProjects(query: ProjectListQuery): PageResult<Project> {
-  return repo.list(query)
+  // "只看待办"的判定规则没法用 SQL 直接表达，先在业务层算出 id 集合再下推，
+  // 这样分页与总数统计仍然由数据库负责，结果是对的
+  const restrictIds =
+    query.todo && query.todo !== 'all' ? getAlertProjectIds(query.todo) : null
+  return repo.list(query, restrictIds)
+}
+
+/** 导出 Excel 用：按同一套筛选条件取全部匹配行（不分页） */
+export function listProjectsForExport(query: ProjectListQuery): Project[] {
+  const restrictIds =
+    query.todo && query.todo !== 'all' ? getAlertProjectIds(query.todo) : null
+  return repo.listAll(query, restrictIds)
 }
 
 export function getProject(id: string): Project | null {
@@ -383,7 +396,12 @@ export function removeProject(id: string): ActionResult {
   const before = repo.findById(id)
   if (!before) return { ok: false, message: '项目不存在或已被删除' }
   getDb().transaction(() => {
+    // 附件记录随 ON DELETE CASCADE 一起清掉
     repo.remove(id)
   })
+  // 磁盘上的照片目录必须在事务提交之后再删：
+  // 万一事务回滚，库里还有记录却没了文件，界面就成了破图。
+  // 反过来删文件失败只是留个孤儿目录，不影响数据正确性。
+  removeProjectFiles(id)
   return { ok: true }
 }

@@ -158,3 +158,46 @@ export const SEED_V1_DICT: Array<[string, string, string, number]> = [
   ['source', 'court', '司法委托', 50],
   ['source', 'other', '其他', 99]
 ]
+
+/**
+ * ─────────────────────────────────────────────
+ * v2：现场照片 / 附件归档
+ * ─────────────────────────────────────────────
+ *
+ * 设计取舍：
+ * - 文件本身存在 userData/attachments/<project_id>/<uuid>.<ext>，表里只存元数据
+ *   与相对路径。数据库保持"小而可备份"，照片不进 BLOB（否则每次备份都把几十
+ *   上百 MB 塞进 db 文件，读写都会变慢）。
+ * - stored_name 用 uuid 而不是原文件名：原文件名可能重名、带中文、带 emoji、
+ *   甚至带路径分隔符，直接拿来当磁盘名是自找麻烦。原文件名单独存一列供界面显示。
+ * - rel_path 走 UNIQUE：既防止同一条记录被插两次，也给了协议层一个反查索引。
+ * - width/height/taken_at 是给后续"按拍摄时间排序""生成缩略图缓存"预留的，
+ *   本期不填，所以允许为 NULL。
+ */
+export const SCHEMA_V2 = /* sql */ `
+CREATE TABLE IF NOT EXISTS attachment (
+  id          TEXT PRIMARY KEY,               -- crypto.randomUUID()，同时用作磁盘文件名
+  project_id  TEXT NOT NULL REFERENCES project(id) ON DELETE CASCADE,
+  file_name   TEXT NOT NULL,                  -- 用户原始文件名（仅界面显示，不进磁盘路径）
+  stored_name TEXT NOT NULL,                  -- 磁盘文件名：<uuid>.<ext>
+  rel_path    TEXT NOT NULL UNIQUE,           -- 相对 attachments 根：<project_id>/<uuid>.<ext>
+  ext         TEXT NOT NULL DEFAULT '',       -- 小写、不含点，如 'jpg'
+  mime_type   TEXT,                           -- 由扩展名推断
+  size_bytes  INTEGER NOT NULL DEFAULT 0,
+  width       INTEGER,                        -- 预留
+  height      INTEGER,                        -- 预留
+  taken_at    TEXT,                           -- 预留（EXIF 拍摄时间，本期不填）
+  sort        INTEGER NOT NULL DEFAULT 0,     -- 排序（本期=创建顺序，预留拖拽）
+  created_at  TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+);
+
+-- 覆盖唯一查询模式：按项目取列表并按 sort / 时间排序
+CREATE INDEX IF NOT EXISTS idx_attachment_project ON attachment(project_id, sort, created_at);
+`
+
+/** v2 预置数据 */
+export const SEED_V2_SETTINGS: Array<[string, string]> = [
+  // 上次从备份恢复的时间。跟 v1 的 db.last_backup_at 配对，让用户能看出
+  // "上次备份/恢复是什么时候"。两者都只在界面上展示，不做自动调度。
+  ['db.last_restore_at', '']
+]

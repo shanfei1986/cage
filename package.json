@@ -13,7 +13,7 @@
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
-    "selftest": "esbuild scripts/db-selftest.ts --bundle --platform=node --format=cjs --alias:@shared=./src/shared --external:electron --external:node:sqlite --outfile=.selftest/selftest.cjs --log-level=warning && node .selftest/selftest.cjs",
+    "selftest": "esbuild scripts/db-selftest.ts --bundle --platform=node --format=cjs --alias:@shared=./src/shared --external:electron --external:node:sqlite --external:exceljs --external:adm-zip --outfile=.selftest/selftest.cjs --log-level=warning && node .selftest/selftest.cjs",
     "e2e": "electron-vite build && electron scripts/e2e-smoke.cjs --no-sandbox --disable-gpu",
     "screenshots": "electron-vite build && electron scripts/screenshots.cjs --no-sandbox --disable-gpu",
     "icon": "python3 scripts/make_icon.py",
@@ -22,26 +22,28 @@
     "build:unpack": "npm run build && electron-builder --dir"
   },
   "dependencies": {
-    "@ant-design/icons": "^5.6.1",
-    "antd": "^5.29.3",
-    "dayjs": "^1.11.13",
-    "echarts": "^6.1.0",
-    "echarts-for-react": "^3.0.6",
-    "exceljs": "^4.4.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.4",
-    "zustand": "^5.0.15"
+    "adm-zip": "^0.5.16",
+    "exceljs": "^4.4.0"
   },
   "devDependencies": {
+    "@ant-design/icons": "^5.6.1",
+    "@types/adm-zip": "^0.5.7",
     "@types/node": "^24.9.0",
     "@types/react": "^18.3.31",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^5.2.0",
+    "antd": "^5.29.3",
+    "dayjs": "^1.11.13",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.0.6",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^7.18.4",
     "typescript": "^5.9.3",
-    "vite": "^7.3.6"
+    "vite": "^7.3.6",
+    "zustand": "^5.0.15"
   }
 }

@@ -5,6 +5,7 @@ import type {
   ProjectStatus,
   ProjectUpdateInput
 } from '@shared/types'
+import type { RendererApi } from '@shared/api'
 
 /**
  * 渲染层对 preload 暴露的 window.api 再包一层薄封装。
@@ -21,7 +22,11 @@ async function call<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-export const api = {
+/**
+ * 显式标注 RendererApi：这样 preload 与渲染层两边的方法签名被同一份接口约束，
+ * 加通道时漏一处 TS 就会报错，不会等到运行时才 "is not a function"。
+ */
+export const api: RendererApi = {
   app: {
     info: () => call(() => window.api.app.info())
   },
@@ -41,7 +46,21 @@ export const api = {
     countByStatus: () => call(() => window.api.project.countByStatus()),
     clients: () => call(() => window.api.project.clients()),
     logs: (id: string) => call(() => window.api.project.logs(id)),
-    recentLogs: (limit?: number) => call(() => window.api.project.recentLogs(limit))
+    recentLogs: (limit?: number) => call(() => window.api.project.recentLogs(limit)),
+    exportExcel: (query: ProjectListQuery, outPath?: string) =>
+      call(() => window.api.project.exportExcel(query, outPath))
+  },
+
+  alert: {
+    list: () => call(() => window.api.alert.list()),
+    counts: () => call(() => window.api.alert.counts())
+  },
+
+  attachment: {
+    list: (projectId: string) => call(() => window.api.attachment.list(projectId)),
+    add: (projectId: string) => call(() => window.api.attachment.add(projectId)),
+    remove: (attachmentId: string) => call(() => window.api.attachment.remove(attachmentId)),
+    counts: () => call(() => window.api.attachment.counts())
   },
 
   dict: {
@@ -53,6 +72,17 @@ export const api = {
   setting: {
     getAll: () => call(() => window.api.setting.getAll()),
     set: (key: string, value: string) => call(() => window.api.setting.set(key, value))
+  },
+
+  stats: {
+    overview: (months?: number) => call(() => window.api.stats.overview(months))
+  },
+
+  backup: {
+    info: () => call(() => window.api.backup.info()),
+    create: (outPath?: string) => call(() => window.api.backup.create(outPath)),
+    inspect: (zipPath?: string) => call(() => window.api.backup.inspect(zipPath)),
+    restore: (zipPath: string) => call(() => window.api.backup.restore(zipPath))
   }
 }
 

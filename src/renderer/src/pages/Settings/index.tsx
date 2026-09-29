@@ -13,6 +13,7 @@ import {
 } from 'antd'
 import type { AppInfo } from '@shared/api'
 import api from '../../api'
+import BackupCard from './BackupCard'
 
 const ALERT_FIELDS: Array<{ key: string; label: string; hint: string; def: number }> = [
   { key: 'alert.receive_contact_days', label: '接单后未联系委托方提醒（天）', hint: '超过这个天数还没联系客户，列入待办', def: 3 },
@@ -83,7 +84,7 @@ export default function Settings(): React.JSX.Element {
           type="info"
           showIcon
           style={{ marginBottom: 16 }}
-          message="这些阈值的实际生效要等「待办提醒与超期预警」功能接入（下一阶段）。现在设置好即可，届时自动生效。"
+          message="这些阈值保存后立即生效，「工作台 · 今日待办」和项目列表的行标记都会按新阈值重新计算。"
         />
         <Form form={form} layout="vertical" style={{ maxWidth: 560 }}>
           {ALERT_FIELDS.map((f) => (
@@ -100,6 +101,8 @@ export default function Settings(): React.JSX.Element {
         </Button>
       </Card>
 
+      <BackupCard />
+
       <Card title="运行环境（排查问题用）" size="small">
         {info && (
           <Descriptions size="small" column={1} bordered>
@@ -113,11 +116,14 @@ export default function Settings(): React.JSX.Element {
             </Descriptions.Item>
             <Descriptions.Item label="数据文件">{info.dbPath}</Descriptions.Item>
             <Descriptions.Item label="数据目录">{info.userData}</Descriptions.Item>
+            <Descriptions.Item label="照片目录">
+              {info.userData ? `${info.userData}/attachments` : '—'}
+            </Descriptions.Item>
           </Descriptions>
         )}
         <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 12 }}>
           数据完全存在本机，不联网、不上传。请勿把数据目录放进 OneDrive 等网盘同步文件夹，
-          以免数据库损坏。数据备份功能将在统计导出阶段一并提供。
+          以免数据库文件被同步过程改坏。需要搬到别的电脑时，用上面的「立即备份」导出 zip 再恢复即可。
         </Typography.Text>
       </Card>
     </Space>

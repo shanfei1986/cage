@@ -5,7 +5,7 @@
 纯标准库实现（zlib + struct），不依赖 Pillow。
 
 图形：蓝色圆角方块 + 白色文档 + 蓝色文字线 + 右下角绿色对勾。
-先用 4 倍分辨率逐像素判定、再盒式降采样，得到平滑边缘。
+先用 3 倍分辨率逐像素判定、再盒式降采样，得到平滑边缘。
 """
 
 import os
@@ -13,7 +13,7 @@ import struct
 import zlib
 
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'build')
-SUPER = 4  # 超采样倍数
+SUPER = 3  # 超采样倍数
 
 
 # ─────────────────────────── 几何工具 ───────────────────────────
@@ -238,9 +238,10 @@ def write_ico(path, images):
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
 
-    # 256 已满足 Windows 图标最大尺寸要求；超采样 4 倍后降到 256，边缘足够平滑。
-    # 再大只是徒增渲染时间，对图标没有实际收益。
-    base = 256
+    # 基准尺寸取 512：Windows 的 ico 里最大那档只需要 256，但 electron-builder
+    # 在非 Windows 平台打「解包验证」包时会要求图标至少 512×512，
+    # 而 512 的 png 顺手也能当高清图标用。超过 512 只是徒增渲染时间。
+    base = 512
     print(f'渲染 {base}×{base}（{SUPER} 倍精度）…')
     # 先在 base*SUPER 上逐像素渲染，再降到 base，得到平滑边缘
     big = render(base * SUPER)

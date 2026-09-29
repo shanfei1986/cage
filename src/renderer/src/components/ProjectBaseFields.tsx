@@ -119,6 +119,9 @@ export default function ProjectBaseFields({
         <Form.Item label="负责人" name="handler" style={{ width: 160 }}>
           <Input placeholder="单飞" />
         </Form.Item>
+        <Form.Item label="检测人员" name="testers" style={{ width: 200 }}>
+          <Input placeholder="张三、李四" />
+        </Form.Item>
         {isEdit && (
           <Form.Item
             label="报告应出日期"

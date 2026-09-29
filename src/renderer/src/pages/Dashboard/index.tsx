@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import type { ProjectLog, ProjectStatus } from '@shared/types'
 import { STATUS_COLOR, STATUS_LABEL, TERMINAL_STATUS } from '@shared/projectStatus'
 import api from '../../api'
+import TodoCard from './TodoCard'
 
 /** 各个阶段单独成卡片，一眼看出积压在哪一步 */
 const STAGE_CARDS: ProjectStatus[] = [
@@ -85,6 +86,8 @@ export default function Dashboard(): React.JSX.Element {
         </Row>
       </Card>
 
+      <TodoCard />
+
       <Card size="small" title="各阶段在办数量">
         <Row gutter={[16, 16]}>
           {STAGE_CARDS.map((s) => (
@@ -104,9 +107,6 @@ export default function Dashboard(): React.JSX.Element {
             </Col>
           ))}
         </Row>
-        <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginTop: 12 }}>
-          待办提醒与超期预警（今日应进场、报告超期、项目停滞等）将在下一阶段接入。
-        </Typography.Text>
       </Card>
 
       <Card

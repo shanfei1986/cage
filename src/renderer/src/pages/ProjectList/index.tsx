@@ -16,23 +16,27 @@ import {
   Typography
 } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { DeleteOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
+import { DeleteOutlined, DownloadOutlined, PlusOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
-import type { DictItem, Project, ProjectCreateInput, ProjectStatus } from '@shared/types'
+import type { AlertLevel, DictItem, Project, ProjectCreateInput, ProjectStatus } from '@shared/types'
 import {
   REPORT_STATUS_LABEL,
   STATUS_COLOR,
   STATUS_LABEL,
   TEST_STATUS_LABEL
 } from '@shared/projectStatus'
+import { ALERT_LEVEL_LABEL, type ProjectAlert } from '@shared/alerts'
 import { normalizeTaskNo } from '@shared/taskNo'
 import ProjectBaseFields, { type DictOptions } from '../../components/ProjectBaseFields'
+import { AlertHitsTags } from '../../components/AlertTag'
 import api from '../../api'
 
 const PAGE_SIZE = 20
 
 type DictBundle = Record<string, DictItem[]>
+
+type TodoFilter = AlertLevel | 'all'
 
 export default function ProjectList(): React.JSX.Element {
   const navigate = useNavigate()
@@ -43,6 +47,7 @@ export default function ProjectList(): React.JSX.Element {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dict, setDict] = useState<DictBundle>({})
   const [clients, setClients] = useState<string[]>([])
@@ -52,6 +57,9 @@ export default function ProjectList(): React.JSX.Element {
     (searchParams.get('status') as ProjectStatus) || 'all'
   )
   const [client, setClient] = useState<string | undefined>(undefined)
+  const [todo, setTodo] = useState<TodoFilter>('all')
+  /** 待办索引：一次取全量待办，列表里按 project_id 查，避免每行一次 IPC */
+  const [alertMap, setAlertMap] = useState<Map<string, ProjectAlert>>(new Map())
 
   const [modalOpen, setModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -63,28 +71,34 @@ export default function ProjectList(): React.JSX.Element {
       setLoading(true)
       setError(null)
       try {
-        const res = await api.project.list({
-          keyword,
-          status,
-          client_name: client,
-          page: targetPage,
-          pageSize: PAGE_SIZE
-        })
+        // 待办清单和列表是两件事，但一起取能少一轮往返，而且数量很小
+        const [res, alerts] = await Promise.all([
+          api.project.list({
+            keyword,
+            status,
+            client_name: client,
+            todo,
+            page: targetPage,
+            pageSize: PAGE_SIZE
+          }),
+          api.alert.list()
+        ])
         setRows(res.rows)
         setTotal(res.total)
+        setAlertMap(new Map(alerts.map((a) => [a.project_id, a])))
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
       } finally {
         setLoading(false)
       }
     },
-    [keyword, status, client, page]
+    [keyword, status, client, todo, page]
   )
 
   useEffect(() => {
     void load(page)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, status, client])
+  }, [page, status, client, todo])
 
   useEffect(() => {
     void (async () => {
@@ -122,10 +136,31 @@ export default function ProjectList(): React.JSX.Element {
     void load(1)
   }
 
+  /**
+   * 导出台账：导出的是"当前筛选条件下的全部匹配项目"，不是当前这一页 ——
+   * 否则用户筛完看到 200 条、导出只拿到 20 条，会以为筛选没生效。
+   */
+  async function onExport(): Promise<void> {
+    setExporting(true)
+    try {
+      const res = await api.project.exportExcel({ keyword, status, client_name: client, todo })
+      if (!res.ok) {
+        if (res.message !== '已取消导出') message.warning(res.message)
+        return
+      }
+      message.success(res.message)
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : String(e))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   function onReset(): void {
     setKeyword('')
     setStatus('all')
     setClient(undefined)
+    setTodo('all')
     setPage(1)
     setSearchParams({})
     setTimeout(() => void load(1), 0)
@@ -150,6 +185,7 @@ export default function ProjectList(): React.JSX.Element {
       test_category: (values.test_category as string) ?? null,
       source: (values.source as string) ?? null,
       handler: (values.handler as string) ?? null,
+      testers: (values.testers as string) ?? null,
       building_count: (values.building_count as number) ?? null,
       building_area: (values.building_area as number) ?? null,
       floors: (values.floors as string) ?? null,
@@ -208,7 +244,27 @@ export default function ProjectList(): React.JSX.Element {
         </Tooltip>
       )
     },
-    { title: '项目名称', dataIndex: 'name', width: 190, ellipsis: true },
+    {
+      title: '项目名称',
+      dataIndex: 'name',
+      width: 190,
+      // 这一列不用 ellipsis：待办原因要换行显示在名称下方
+      render: (v: string, r) => {
+        const alert = alertMap.get(r.id)
+        return (
+          <div>
+            <Tooltip title={v}>
+              <div
+                style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              >
+                {v}
+              </div>
+            </Tooltip>
+            {alert && <AlertHitsTags hits={alert.hits} max={1} size="small" />}
+          </div>
+        )
+      }
+    },
     { title: '委托方', dataIndex: 'client_name', width: 160, ellipsis: true },
     {
       title: '当前阶段',
@@ -324,6 +380,20 @@ export default function ProjectList(): React.JSX.Element {
             ]}
           />
           <Select
+            style={{ width: 140 }}
+            value={todo}
+            onChange={(v) => {
+              setTodo(v)
+              setPage(1)
+            }}
+            options={[
+              { value: 'all', label: '全部项目' },
+              { value: 'overdue', label: `只看${ALERT_LEVEL_LABEL.overdue}` },
+              { value: 'today', label: `只看${ALERT_LEVEL_LABEL.today}` },
+              { value: 'soon', label: `只看${ALERT_LEVEL_LABEL.soon}` }
+            ]}
+          />
+          <Select
             allowClear
             style={{ width: 200 }}
             placeholder="委托方"
@@ -341,6 +411,9 @@ export default function ProjectList(): React.JSX.Element {
             重置
           </Button>
           <div style={{ flex: 1 }} />
+          <Button icon={<DownloadOutlined />} loading={exporting} onClick={() => void onExport()}>
+            导出台账
+          </Button>
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -362,6 +435,12 @@ export default function ProjectList(): React.JSX.Element {
           columns={columns}
           dataSource={rows}
           scroll={{ x: 1046 }}
+          // 待办行整行打标：左侧色条 + 浅底色。比插一列"待办"更省横向空间，
+          // 也不会破坏表格布局
+          rowClassName={(r) => {
+            const a = alertMap.get(r.id)
+            return a ? `row-alert-${a.level}` : ''
+          }}
           pagination={{
             current: page,
             pageSize: PAGE_SIZE,

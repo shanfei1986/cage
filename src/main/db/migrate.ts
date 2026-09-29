@@ -1,5 +1,11 @@
 import type { SqliteDriver } from './driver'
-import { SCHEMA_V1, SEED_V1_DICT, SEED_V1_SETTINGS } from './schema'
+import { SCHEMA_V1, SCHEMA_V2, SEED_V1_DICT, SEED_V1_SETTINGS, SEED_V2_SETTINGS } from './schema'
+
+/**
+ * 当前 schema 版本。每加一个 if (current < N) 分支就把这个数字 +1。
+ * 自检脚本用它断言「迁移一路升到最新版」，避免改了迁移却忘了改断言。
+ */
+export const SCHEMA_VERSION = 2
 
 /**
  * 迁移：以 SQLite 自带的 user_version 作为版本号驱动。
@@ -27,6 +33,19 @@ export function runMigrations(db: SqliteDriver): { from: number; to: number } {
       )
     })
     version = 1
+    db.exec(`PRAGMA user_version = ${version}`)
+  }
+
+  if (version < 2) {
+    db.transaction(() => {
+      db.exec(SCHEMA_V2)
+      const insertSetting = SEED_V2_SETTINGS.map(() => '(?,?)').join(',')
+      db.run(
+        `INSERT OR IGNORE INTO setting (key, value) VALUES ${insertSetting}`,
+        ...SEED_V2_SETTINGS.flat()
+      )
+    })
+    version = 2
     db.exec(`PRAGMA user_version = ${version}`)
   }
 

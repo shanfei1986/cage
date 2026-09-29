@@ -1,8 +1,14 @@
 import { app, ipcMain } from 'electron'
+import { join } from 'node:path'
 import { getDbPath } from '../db/connection'
 import { isNodeSqliteAvailable } from '../db/driver'
 import { registerProjectIpc } from './project.ipc'
 import { registerDictIpc, registerSettingIpc } from './setting.ipc'
+import { registerAlertIpc } from './alert.ipc'
+import { registerExportIpc } from './export.ipc'
+import { registerAttachmentIpc } from './attachment.ipc'
+import { registerStatsIpc } from './stats.ipc'
+import { registerBackupIpc } from './backup.ipc'
 
 /**
  * 统一注册入口。以后加领域就加一个 registerXxxIpc()，在主进程启动时调用一次。
@@ -12,6 +18,12 @@ export function registerIpc(): void {
   registerProjectIpc()
   registerSettingIpc()
   registerDictIpc()
+  registerAlertIpc()
+  registerExportIpc()
+  registerAttachmentIpc()
+  registerStatsIpc()
+  // 恢复前的自动备份固定落在 <userData>/backups，不给界面选择权
+  registerBackupIpc(join(app.getPath('userData'), 'backups'))
 
   // 运行环境自检信息，设置页"关于"里展示，也方便排查问题
   ipcMain.handle('app:info', () => ({

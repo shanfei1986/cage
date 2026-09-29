@@ -36,6 +36,25 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
+      # 守卫：主进程真正 require 的包必须留在 dependencies。
+      # electron-vite 会按 dependencies 把它们「外置」（不打进 bundle），
+      # 运行时从 node_modules 加载，而 electron-builder 只附带 dependencies 里的包。
+      # 一旦误挪进 devDependencies，本地开发和测试全都正常，只有装到别人电脑上
+      # 点到「导出 Excel」才会报模块找不到 —— 所以在这里卡死。
+      - name: 校验主进程运行时依赖
+        shell: bash
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const need = ['exceljs', 'adm-zip'];
+            const missing = need.filter((d) => !(pkg.dependencies && pkg.dependencies[d]));
+            if (missing.length) {
+              console.error('以下包必须留在 dependencies 里：' + missing.join(', '));
+              process.exit(1);
+            }
+            console.log('主进程运行时依赖校验通过：' + need.join(', '));
+          "
+
       - name: 类型检查
         run: npm run typecheck
         continue-on-error: true

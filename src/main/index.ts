@@ -1,10 +1,19 @@
 import { app, BrowserWindow, dialog, shell } from 'electron'
 import { join } from 'node:path'
-import { closeDatabase, initDatabase } from './db/connection'
+import { closeDatabase, getDbPath, initDatabase } from './db/connection'
 import { registerIpc } from './ipc'
+import { registerMediaProtocol, registerMediaScheme } from './protocol/mediaProtocol'
+import { initAttachmentsDir } from './services/attachment.service'
+import { initBackup } from './services/backup.service'
 
 /** Win 任务栏 / 通知归属用的应用 ID，与 electron-builder 的 appId 保持一致 */
 const APP_ID = 'com.lezu.fwjc'
+
+/**
+ * 注册私有协议必须在 app ready 之前、且只能调用一次，所以放在模块顶层。
+ * 别把它挪进 whenReady —— 那样协议 URL 会全部 404。
+ */
+registerMediaScheme()
 
 /**
  * 显式固定数据目录，不依赖 app name 的推断结果 —— 否则开发态和打包态
@@ -99,6 +108,24 @@ if (!gotLock) {
     }
 
     registerIpc()
+
+    // 现场照片目录与 userData 平级（不放 data 里，免得备份数据库时把它当成数据文件）
+    const attachDir = join(app.getPath('userData'), 'attachments')
+    try {
+      initAttachmentsDir(attachDir)
+      registerMediaProtocol(attachDir)
+    } catch (err) {
+      // 照片功能坏掉不该导致整个软件打不开，只告警
+      console.warn('[attachment] 附件目录初始化失败，照片功能将不可用', err)
+    }
+
+    // 备份要同时拿到数据库文件位置与照片目录；照片初始化失败也要能备份数据库
+    try {
+      initBackup(getDbPath(), attachDir)
+    } catch (err) {
+      console.warn('[backup] 备份服务初始化失败，备份功能将不可用', err)
+    }
+
     createWindow()
   })
 

@@ -8,10 +8,13 @@
       本地离线应用，所有资源都来自应用自身。
       style-src 需要 unsafe-inline：antd 运行时注入样式。
       script-src 的 unsafe-inline/unsafe-eval 是开发模式（Vite HMR）需要的。
+      img-src 里的 fwjc-media: 是现场照片用的私有协议（见 src/main/protocol/mediaProtocol.ts）：
+      照片存在用户数据目录里，用 file: 既过不了 CSP 也会被 webSecurity 拦，所以单独放行这一个协议。
+      注意 ECharts 走的是 Canvas 渲染，不产生图片请求，无需为此再放开任何源。
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' ws: wss: http://localhost:* http://127.0.0.1:*"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: fwjc-media:; font-src 'self' data:; connect-src 'self' ws: wss: http://localhost:* http://127.0.0.1:*"
     />
   </head>
   <body>

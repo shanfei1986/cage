@@ -22,6 +22,14 @@ export type TestStatus = 'none' | 'partial' | 'done'
 /** 报告状态 */
 export type ReportStatus = 'none' | 'drafting' | 'issued' | 'sent'
 
+/**
+ * 待办紧急程度。
+ * - overdue 已超期（含"约定检测日期已过"）
+ * - today   恰好今天到期（正好到阈值的第 N 天，或事件日期就是今天）
+ * - soon    还没到，但已进入提醒窗口
+ */
+export type AlertLevel = 'overdue' | 'today' | 'soon'
+
 /** 项目主表记录 */
 export interface Project {
   id: string
@@ -111,6 +119,11 @@ export interface ProjectListQuery {
   keyword?: string
   status?: ProjectStatus | 'all'
   client_name?: string
+  /**
+   * 只看待办。必须是服务端筛选：列表是分页的，如果在前端过滤当前页，
+   * 一页 20 条筛完可能一条不剩，用户会以为数据丢了。
+   */
+  todo?: AlertLevel | 'all'
   page?: number
   pageSize?: number
   sortField?: string
@@ -184,4 +197,91 @@ export interface ActionResult<T = undefined> {
   data?: T
   /** 软提醒：不拦截保存，但要在界面上提示用户 */
   warnings?: string[]
+}
+
+/** 现场照片 / 附件（文件本身在磁盘上，这里只有元数据） */
+export interface Attachment {
+  id: string
+  project_id: string
+  /** 用户原始文件名，仅用于界面显示 */
+  file_name: string
+  /** 磁盘文件名：<uuid>.<ext> */
+  stored_name: string
+  /** 相对 attachments 根目录：<project_id>/<uuid>.<ext> */
+  rel_path: string
+  ext: string
+  mime_type: string | null
+  size_bytes: number
+  width: number | null
+  height: number | null
+  taken_at: string | null
+  sort: number
+  created_at: string
+}
+
+/** 新增附件时的入参（主进程负责生成 id / stored_name / rel_path） */
+export interface AttachmentCreateInput {
+  project_id: string
+  file_name: string
+  ext: string
+  mime_type: string | null
+  size_bytes: number
+}
+
+/** 待办候选行：只取评估预警需要的字段，避免把整张 project 表读进来 */
+export interface AlertCandidate {
+  id: string
+  task_no: string
+  name: string
+  status: ProjectStatus
+  test_status: TestStatus
+  receive_date: string | null
+  plan_test_date: string | null
+  report_due_date: string | null
+  report_issue_date: string | null
+  updated_at: string
+}
+
+/** 待办数量汇总 */
+export interface AlertCounts {
+  overdue: number
+  today: number
+  soon: number
+  total: number
+}
+
+/** 统计报表数据（一次查询把 4 个维度全返回，界面上切换时间范围时整体重取） */
+export interface StatsOverview {
+  range: { months: number; since: string }
+  /**
+   * 按月项目量：接单量（按接单日期）+ 报告出具量（按实际出具日期）。
+   * 第二个系列用"报告出具"而不是"归档"：归档只是内部记账动作，很多同事根本
+   * 不会去点；而且实际出具日期是可以补录的，历史项目导进来也能画出真实曲线。
+   * 缺失月份由前端补 0（见 shared/stats.ts 的 mergeTrend）。
+   */
+  trend: Array<{ ym: string; received: number; issued: number }>
+  byProjectType: Array<{ code: string | null; label: string; count: number }>
+  byStatus: Array<{ status: ProjectStatus; count: number }>
+  cycle: {
+    /** 接单 → 实际进场 平均天数 */
+    avgReceiveToTest: number | null
+    /** 接单 → 报告出具 平均天数 */
+    avgReceiveToReport: number | null
+    /** 已出具报告中，实际出具日超过应出日期的份数 */
+    reportOverdueIssued: number
+    /** 填过应出日期、且已出具的报告份数（超期率的分母） */
+    reportIssuedWithDue: number
+    /** 报告超期率（0-1），无样本时为 null */
+    reportOverdueRate: number | null
+    /** 当前在办项目里，报告应出日期已过的数量 */
+    reportOverdueOpen: number
+  }
+}
+
+/** 备份状态 */
+export interface BackupInfo {
+  lastBackupAt: string
+  lastRestoreAt: string
+  /** 备份文件里会包含的内容说明，直接展示给用户看 */
+  includes: string[]
 }

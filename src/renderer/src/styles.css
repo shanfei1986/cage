@@ -42,3 +42,77 @@ body {
   height: 100%;
   overflow: auto;
 }
+
+/*
+ * 待办行标记。
+ * 用整行左侧色条 + 浅底色，而不是插一列"待办"：表格横向空间本来就紧张，
+ * 加一列会把"操作"列挤到滚动区外面。第一列是 fixed:'left'，色条会跟着一起固定。
+ */
+.ant-table-tbody > tr.row-alert-overdue > td {
+  background: #fff2f0;
+}
+.ant-table-tbody > tr.row-alert-today > td {
+  background: #fffbe6;
+}
+.ant-table-tbody > tr.row-alert-soon > td {
+  background: #f0f7ff;
+}
+
+.ant-table-tbody > tr.row-alert-overdue > td:first-child {
+  box-shadow: inset 4px 0 0 0 #ff4d4f;
+}
+.ant-table-tbody > tr.row-alert-today > td:first-child {
+  box-shadow: inset 4px 0 0 0 #faad14;
+}
+.ant-table-tbody > tr.row-alert-soon > td:first-child {
+  box-shadow: inset 4px 0 0 0 #1677ff;
+}
+
+/* hover 时不要盖掉待办底色，否则鼠标扫过就看不到哪些是待办了 */
+.ant-table-tbody > tr.row-alert-overdue:hover > td,
+.ant-table-tbody > tr.row-alert-today:hover > td,
+.ant-table-tbody > tr.row-alert-soon:hover > td {
+  filter: brightness(0.98);
+}
+
+/* 现场照片墙 */
+.photo-wall {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.photo-wall-item {
+  position: relative;
+  width: 132px;
+  height: 112px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #e8e8e8;
+  background: #fafafa;
+}
+
+.photo-wall-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 删除按钮平时隐藏，鼠标移到照片上才出现，避免误点 */
+.photo-wall-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: #fff;
+  font-size: 12px;
+}
+
+.photo-wall-item:hover .photo-wall-remove {
+  opacity: 1;
+}

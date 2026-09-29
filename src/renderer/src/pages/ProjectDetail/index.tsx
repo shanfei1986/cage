@@ -38,6 +38,7 @@ import ProjectBaseFields, {
   type DictOptions
 } from '../../components/ProjectBaseFields'
 import api from '../../api'
+import PhotoWall from './PhotoWall'
 
 const DATE_FIELDS = [
   'receive_date',
@@ -188,6 +189,7 @@ export default function ProjectDetail(): React.JSX.Element {
         test_category: (v.test_category as string) ?? null,
         source: (v.source as string) ?? null,
         handler: (v.handler as string) ?? null,
+        testers: (v.testers as string) ?? null,
         building_count: (v.building_count as number) ?? null,
         building_area: (v.building_area as number) ?? null,
         floors: (v.floors as string) ?? null,
@@ -387,6 +389,7 @@ export default function ProjectDetail(): React.JSX.Element {
           <Descriptions.Item label="层数">{project.floors ?? '-'}</Descriptions.Item>
           <Descriptions.Item label="结构形式">{project.struct_type ?? '-'}</Descriptions.Item>
           <Descriptions.Item label="负责人">{project.handler ?? '-'}</Descriptions.Item>
+          <Descriptions.Item label="检测人员">{project.testers ?? '-'}</Descriptions.Item>
           <Descriptions.Item label="接单日期">{project.receive_date ?? '-'}</Descriptions.Item>
           <Descriptions.Item label="要求完成">{project.expect_finish_date ?? '-'}</Descriptions.Item>
           <Descriptions.Item label="约定检测日期">{project.plan_test_date ?? '-'}</Descriptions.Item>
@@ -436,6 +439,8 @@ export default function ProjectDetail(): React.JSX.Element {
           <Descriptions.Item label="归档时间">{project.closed_at ?? '-'}</Descriptions.Item>
         </Descriptions>
       </Card>
+
+      <PhotoWall projectId={project.id} />
 
       <Card size="small" title="操作记录（时间轴）">
         {logs.length === 0 ? (

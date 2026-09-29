@@ -147,14 +147,28 @@ export function remove(id: string): void {
   getDb().run('DELETE FROM project WHERE id = ?', id)
 }
 
-/** 列表查询：关键字 + 状态筛选 + 分页 */
-export function list(query: ProjectListQuery): PageResult<Project> {
+/**
+ * 列表查询：关键字 + 状态筛选 + 分页。
+ *
+ * restrictIds 用于"只看待办"这类由业务层算出来的 id 集合（SQL 里没法直接表达那些
+ * 判定规则）。传 null 表示不限制；传空数组表示"一条都不匹配"，必须直接返回空页 ——
+ * 否则会拼出 `IN ()` 这种非法 SQL。
+ */
+export function list(query: ProjectListQuery, restrictIds?: string[] | null): PageResult<Project> {
   const page = Math.max(1, Number(query.page) || 1)
   const pageSize = Math.min(200, Math.max(1, Number(query.pageSize) || 20))
+
+  if (restrictIds && restrictIds.length === 0) {
+    return { rows: [], total: 0, page, pageSize }
+  }
 
   const where: string[] = []
   const params: Array<string | number> = []
 
+  if (restrictIds && restrictIds.length > 0) {
+    where.push(`id IN (${restrictIds.map(() => '?').join(',')})`)
+    params.push(...restrictIds)
+  }
   if (query.status && query.status !== 'all') {
     where.push('status = ?')
     params.push(query.status)
@@ -184,6 +198,23 @@ export function list(query: ProjectListQuery): PageResult<Project> {
   )
 
   return { rows, total, page, pageSize }
+}
+
+/**
+ * 取全部匹配行（不分页），供导出 Excel 用。
+ * 加个上限防止极端情况下把内存撑爆 —— 真要导几万行，那是另一个量级的问题。
+ */
+export function listAll(query: ProjectListQuery, restrictIds?: string[] | null): Project[] {
+  const pageSize = 200
+  const first = list({ ...query, page: 1, pageSize }, restrictIds)
+  if (first.total <= first.rows.length) return first.rows
+
+  const out: Project[] = [...first.rows]
+  const pages = Math.ceil(first.total / pageSize)
+  for (let p = 2; p <= pages; p++) {
+    out.push(...list({ ...query, page: p, pageSize }, restrictIds).rows)
+  }
+  return out
 }
 
 /** 各状态项目数量，仪表盘与列表页签用 */

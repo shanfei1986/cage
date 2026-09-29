@@ -6,10 +6,16 @@ directories:
   output: dist
   buildResources: build
 
-# 只把构建产物和 package.json 打进包里，源码不进
+# 只把构建产物和 package.json 打进包里，源码不进。
+# 注意：这里写的 patterns 只作用于应用目录，node_modules 里的**生产依赖**
+# （即 package.json 的 dependencies）由 electron-builder 自动附带，不受这里影响。
+# 所以 exceljs / adm-zip 能进包，而挪到 devDependencies 的前端库（antd、react、
+# echarts…）不会进 —— 它们本来就由 Vite 打进界面 bundle，再进 asar 纯属浪费体积。
 files:
   - out/**/*
   - package.json
+  # 前端库带大量 .map（体积可观）且对运行毫无用处，排除掉
+  - '!**/*.map'
 
 asar: true
 
