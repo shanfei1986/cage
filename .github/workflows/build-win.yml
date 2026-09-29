@@ -1,0 +1,57 @@
+name: 构建 Windows 安装包
+
+# 为什么要在 GitHub 的 Windows 机器上构建：
+# 在 macOS 上交叉编译 Windows 包必须额外装 wine，Apple Silicon 上还有
+# 默认产出 arm64、目录名长度敏感、无法签名三个坑。放到真实的 win32
+# 环境里构建，这些问题全部消失，也不需要你自己准备一台 Windows 电脑。
+#
+# 免费额度：私有仓库 Free 计划每月 2000 分钟，Windows runner 按 2 倍计
+# （约 1000 Windows 分钟/月）。单次构建 3-8 分钟，够用 100 多次。
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  # 没发版需求时也能手动点一下按钮出包
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-win:
+    name: 构建 Windows x64 安装包
+    runs-on: windows-latest
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 类型检查
+        run: npm run typecheck
+        continue-on-error: true
+
+      - name: 构建并打包
+        run: npm run build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传安装包
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            dist/*.exe
+            dist/*.blockmap
+            dist/latest.yml
+          if-no-files-found: error
+          retention-days: 30

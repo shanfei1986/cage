@@ -1,0 +1,21 @@
+# 依赖
+node_modules/
+
+# 构建产物
+out/
+dist/
+.selftest/
+
+# 编辑器 / 系统
+.DS_Store
+.vscode/
+.idea/
+*.log
+npm-debug.log*
+
+# 本地环境变量
+.env
+.env.local
+
+# electron-vite 加载 TS 配置时生成的临时文件
+electron.vite.config.*.mjs

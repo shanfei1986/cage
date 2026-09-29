@@ -1,0 +1,51 @@
+appId: com.lezu.fwjc
+productName: 检测项目管理系统
+copyright: Copyright © 2026
+
+directories:
+  output: dist
+  buildResources: build
+
+# 只把构建产物和 package.json 打进包里，源码不进
+files:
+  - out/**/*
+  - package.json
+
+asar: true
+
+# 本项目没有任何原生模块（用的是 Node 内置 node:sqlite），
+# 关掉 rebuild 能明显加快构建、也少一类失败原因
+npmRebuild: false
+nodeGypRebuild: false
+
+# 只保留中英文资源，减小安装包体积
+electronLanguages:
+  - zh-CN
+  - en-US
+
+win:
+  target:
+    - target: nsis
+      # 必须显式写 x64：在 Apple Silicon 上不写会默认产出 arm64 包
+      arch:
+        - x64
+  icon: build/icon.ico
+  artifactName: 检测项目管理系统-${version}-安装包.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 检测项目管理系统
+  # 卸载绝不能删用户数据 —— 项目记录都在 %APPDATA% 里
+  deleteAppDataOnUninstall: false
+  language: '2052'
+  installerLanguages:
+    - zh_CN
+  runAfterFinish: true
+
+# 免安装单文件版（内部分发备用通道，用 npm run build:win:portable 触发）
+portable:
+  artifactName: 检测项目管理系统-${version}-免安装.${ext}
